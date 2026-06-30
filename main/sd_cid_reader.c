@@ -300,6 +300,9 @@ static void unmount_card(void)
 
 void app_main(void)
 {
+    esp_log_level_set("*", ESP_LOG_WARN);
+    esp_log_level_set(TAG, ESP_LOG_INFO);
+
     ESP_LOGI(TAG, "Starting SD Card Reader");
 
     led_init();
