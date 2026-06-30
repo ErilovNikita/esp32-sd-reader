@@ -1,0 +1,13 @@
+ESP32 SD READER
+
+Copyright: (c) 2026 Erilov Nikita
+
+This project is an ESP32-S3 firmware for reading SD card metadata,
+including CID, manufacturer information, serial number, manufacturing
+date, capacity, used space, and free space.
+
+Third-party components:
+  - ESP-IDF by Espressif Systems
+  - espressif/led_strip component by Espressif Systems
+
+Third-party components are distributed under their respective licenses.

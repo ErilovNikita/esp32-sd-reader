@@ -1,0 +1,38 @@
+# ESP-IDF / CMake build output
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+*.elf
+*.bin
+*.map
+
+# ESP-IDF component manager output
+managed_components/
+
+# Python virtual environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+
+# Local environment overrides
+.env
+.env.*
+!.env.example
+sdkconfig.old
+sdkconfig.defaults.*
