@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{PROJECT_NAME}}</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #f4f5f7;
+            color: #1c2430;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #f4f5f7;
+        }
+
+        main {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+
+        h1 {
+            font-size: 28px;
+            line-height: 1.1;
+            margin: 0 0 8px;
+        }
+
+        .muted {
+            color: #667085;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 14px;
+            color: #344054;
+        }
+
+        .status-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .refresh-toggle {
+            height: 26px;
+            border: 0;
+            border-radius: 6px;
+            background: #f2f4f7;
+            color: #344054;
+            cursor: pointer;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 650;
+            padding: 0 10px;
+        }
+
+        .refresh-toggle:hover {
+            background: #eaecf0;
+        }
+
+        .refresh-toggle.paused {
+            color: #667085;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #1570ef;
+            box-sizing: border-box;
+        }
+
+        .starting .dot {
+            background: #1570ef;
+        }
+
+        .missing .dot {
+            background: #fff;
+            border: 1px solid #98a2b3;
+        }
+
+        .mounting .dot {
+            background: #fdb022;
+        }
+
+        .mounted .dot {
+            background: #12b76a;
+        }
+
+        .failed .dot {
+            background: #d92d20;
+        }
+
+        .blink .dot {
+            animation: status-blink 1s ease-in-out infinite;
+        }
+
+        @keyframes status-blink {
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.25;
+            }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            align-items: start;
+            gap: 14px;
+        }
+
+        .grid.device-only {
+            grid-template-columns: 1fr;
+        }
+
+        .is-hidden {
+            display: none !important;
+        }
+
+        .section {
+            display: grid;
+            grid-template-rows: auto auto;
+            align-content: start;
+            gap: 8px;
+        }
+
+        .info-section {
+            grid-column: 1 / -1;
+        }
+
+        .device-section {
+            grid-column: auto;
+        }
+
+        .grid.device-only .device-section {
+            grid-column: 1 / -1;
+        }
+
+        .section-title {
+            margin: 0;
+            color: #667085;
+            font-size: 13px;
+            font-weight: 600;
+            margin-left: 10px;
+            letter-spacing: 0;
+        }
+
+        .panel {
+            background: #fff;
+            border: none;
+            border-radius: 24px;
+            padding: 14px 16px 14px 16px;
+        }
+
+        .info-panel {
+            color: #667085;
+        }
+
+        .info-title {
+            margin: 0 0 6px;
+            color: #1c2430;
+            font-size: 14px;
+            font-weight: 650;
+        }
+
+        .info-text {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.45;
+        }
+
+        .rows {
+            display: grid;
+            gap: 10px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            border-bottom: 1px solid #eaecf0;
+            padding-bottom: 8px;
+        }
+
+        .row:last-child {
+            border-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .label {
+            color: #1c2430;
+        }
+
+        .value {
+            color: #667085;
+            text-align: right;
+            word-break: break-word;
+        }
+
+        .meter {
+            height: 8px;
+            background: #eaecf0;
+            border-radius: 999px;
+            overflow: hidden;
+            margin: 8px 0 30px;
+        }
+
+        .fill {
+            height: 100%;
+            background: #1570ef;
+            width: {{USAGE_PERCENT}}%;
+        }
+
+        .usage {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            color: #344054;
+            font-size: 12px;
+        }
+
+        .usage-title {
+            color: #667085;
+            font-weight: 650;
+        }
+
+        .usage-value {
+            text-align: right;
+        }
+
+        .storage-rows {
+            margin-top: 14px;
+        }
+
+        .cid {
+            font-family: "SFMono-Regular", Consolas, monospace;
+            font-size: 13px;
+        }
+
+        .copy-value {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            max-width: 100%;
+        }
+
+        .copy-text {
+            min-width: 0;
+            word-break: break-word;
+        }
+
+        .copy-button {
+            width: 26px;
+            height: 26px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            border-radius: 6px;
+            background: #f2f4f7;
+            color: #667085;
+            cursor: pointer;
+            flex: 0 0 auto;
+            padding: 0;
+        }
+
+        .copy-button:hover {
+            background: #eaecf0;
+            color: #344054;
+        }
+
+        .copy-button.copied {
+            color: #12b76a;
+        }
+
+        .copy-icon {
+            width: 15px;
+            height: 15px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .footer {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .repo-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #344054;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 650;
+        }
+
+        .repo-link:hover {
+            text-decoration: underline;
+        }
+
+        .repo-icon {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+            flex: 0 0 auto;
+        }
+
+        @media (max-width: 720px) {
+            main {
+                padding: 18px;
+            }
+
+            .top {
+                display: block;
+            }
+
+            .badge {
+                margin-top: 0;
+            }
+
+            .status-actions {
+                margin-top: 14px;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .row {
+                display: grid;
+                gap: 3px;
+            }
+
+            .value {
+                text-align: left;
+            }
+
+            .copy-value {
+                justify-content: flex-start;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <section class="top">
+            <h1>{{PROJECT_NAME}}<span class="muted"> v{{PROJECT_VERSION}}</span></h1>
+            <div class="status-actions">
+                <div class="badge {{STATUS_CLASS}}" data-status-badge>
+                    <span class="dot"></span>
+                    <span data-field="statusLabel">{{STATUS_LABEL}}</span>
+                </div>
+                <button class="refresh-toggle" type="button" data-refresh-toggle>Online</button>
+            </div>
+        </section>
+
+        <section class="grid {{CONTENT_CLASS}}" data-content-grid>
+            <section class="section info-section {{NO_CARD_HIDDEN}}" data-no-card-message>
+                <h2 class="section-title">Storage</h2>
+                <div class="panel info-panel">
+                    <p class="info-title">No SD card data</p>
+                    <p class="info-text">Insert an SD card, or check that it is installed correctly.</p>
+                </div>
+            </section>
+
+            <section class="section card-data {{CARD_DATA_HIDDEN}}" data-card-data>
+                <h2 class="section-title">Card</h2>
+                <div class="panel">
+                    <div class="rows">
+                        <div class="row"><span class="label">Inserted</span><span class="value" data-field="cardInserted">{{CARD_INSERTED}}</span></div>
+                        <div class="row"><span class="label">Mounted</span><span class="value" data-field="cardMounted">{{CARD_MOUNTED}}</span></div>
+                        <div class="row"><span class="label">Model</span><span class="value" data-field="model">{{MODEL}}</span></div>
+                        <div class="row"><span class="label">Manufacturer</span><span class="value" data-field="manufacturer">{{MANUFACTURER}}</span></div>
+                        <div class="row"><span class="label">Manufacturer ID</span><span class="value" data-field="manufacturerId">{{MANUFACTURER_ID}}</span></div>
+                        <div class="row"><span class="label">OEM ID</span><span class="value" data-field="oemId">{{OEM_ID}}</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section card-data {{CARD_DATA_HIDDEN}}" data-card-data>
+                <h2 class="section-title">Storage</h2>
+                <div class="panel">
+                    <div class="usage">
+                        <span class="usage-title">Card usage</span>
+                        <span class="usage-value" data-field="storageUsedSummary">{{STORAGE_USED_SUMMARY}}</span>
+                    </div>
+                    <div class="meter"><div class="fill" data-usage-fill></div></div>
+                    <div class="rows storage-rows">
+                        <div class="row"><span class="label">Capacity</span><span class="value" data-field="capacityGb">{{CAPACITY_GB}}</span></div>
+                        <div class="row"><span class="label">Used</span><span class="value" data-field="usedGb">{{USED_GB}}</span></div>
+                        <div class="row"><span class="label">Free</span><span class="value" data-field="freeGb">{{FREE_GB}}</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section card-data {{CARD_DATA_HIDDEN}}" data-card-data>
+                <h2 class="section-title">Identity</h2>
+                <div class="panel">
+                    <div class="rows">
+                        <div class="row"><span class="label">Revision</span><span class="value" data-field="revision">{{REVISION}}</span></div>
+                        <div class="row"><span class="label">Serial</span><span class="value" data-field="serial">{{SERIAL}}</span></div>
+                        <div class="row"><span class="label">Manufactured</span><span class="value" data-field="manufactured">{{MANUFACTURED}}</span></div>
+                        <div class="row">
+                            <span class="label">Full CID</span>
+                            <span class="value cid copy-value">
+                                <span class="copy-text" data-field="fullCid">{{FULL_CID}}</span>
+                                <button class="copy-button" type="button" data-copy="{{FULL_CID}}" aria-label="Copy CID" title="Copy CID">
+                                    <svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section device-section">
+                <h2 class="section-title">Device</h2>
+                <div class="panel">
+                    <div class="rows">
+                        <div class="row"><span class="label">Device ID</span><span class="value" data-field="deviceId">{{DEVICE_ID}}</span></div>
+                        <div class="row"><span class="label">Chip</span><span class="value" data-field="chipModel">{{CHIP_MODEL}}</span></div>
+                        <div class="row"><span class="label">Chip revision</span><span class="value" data-field="chipRevision">{{CHIP_REVISION}}</span></div>
+                        <div class="row"><span class="label">CPU cores</span><span class="value" data-field="cpuCores">{{CPU_CORES}}</span></div>
+                        <div class="row"><span class="label">Memory</span><span class="value" data-field="memory">{{MEMORY}}</span></div>
+                        <div class="row"><span class="label">Bus</span><span class="value" data-field="bus">{{BUS}}</span></div>
+                        <div class="row"><span class="label">Last error</span><span class="value" data-field="lastError">{{LAST_ERROR}}</span></div>
+                    </div>
+                </div>
+            </section>
+        </section>
+
+        <footer class="footer">
+            <a class="repo-link" href="{{PROJECT_REPOSITORY_URL}}">
+                <svg class="repo-icon" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 0C3.58 0 0 3.67 0 8.2c0 3.62 2.29 6.69 5.47 7.78.4.08.55-.18.55-.4 0-.2-.01-.85-.01-1.54-2.01.38-2.53-.5-2.69-.96-.09-.24-.48-.96-.82-1.15-.28-.15-.68-.53-.01-.54.63-.01 1.08.59 1.23.84.72 1.24 1.87.89 2.33.68.07-.53.28-.89.51-1.09-1.78-.21-3.64-.91-3.64-4.03 0-.89.31-1.62.82-2.19-.08-.21-.36-1.04.08-2.16 0 0 .67-.22 2.2.84A7.4 7.4 0 0 1 8 4.01c.68 0 1.36.09 2 .27 1.53-1.06 2.2-.84 2.2-.84.44 1.12.16 1.95.08 2.16.51.57.82 1.3.82 2.19 0 3.13-1.87 3.82-3.65 4.03.29.26.54.75.54 1.52 0 1.09-.01 1.97-.01 2.24 0 .22.15.48.55.4A8.09 8.09 0 0 0 16 8.2C16 3.67 12.42 0 8 0Z"></path>
+                </svg>
+                <span>{{PROJECT_REPOSITORY_NAME}}</span>
+            </a>
+        </footer>
+    </main>
+    <script>
+        var autoRefreshEnabled = true;
+        var refreshTimer = null;
+
+        function setText(field, value) {
+            document.querySelectorAll('[data-field="' + field + '"]').forEach(function (element) {
+                element.textContent = value;
+            });
+        }
+
+        function updateCardDataVisibility(hasCardData) {
+            var grid = document.querySelector("[data-content-grid]");
+            var message = document.querySelector("[data-no-card-message]");
+
+            if (grid) {
+                grid.classList.toggle("device-only", !hasCardData);
+            }
+
+            document.querySelectorAll("[data-card-data]").forEach(function (section) {
+                section.classList.toggle("is-hidden", !hasCardData);
+            });
+
+            if (message) {
+                message.classList.toggle("is-hidden", hasCardData);
+            }
+        }
+
+        function updateStatus(data) {
+            var badge = document.querySelector("[data-status-badge]");
+            var fill = document.querySelector("[data-usage-fill]");
+            var copyButton = document.querySelector("[data-copy]");
+
+            if (badge) {
+                badge.className = "badge " + data.statusClass;
+            }
+
+            if (fill) {
+                fill.style.width = data.usagePercent + "%";
+            }
+
+            if (copyButton) {
+                copyButton.setAttribute("data-copy", data.fullCid);
+            }
+
+            updateCardDataVisibility(data.hasCardData);
+
+            Object.keys(data).forEach(function (key) {
+                if (key !== "statusClass" && key !== "usagePercent" && key !== "hasCardData") {
+                    setText(key, data[key]);
+                }
+            });
+        }
+
+        function refreshStatus() {
+            if (!autoRefreshEnabled) {
+                return;
+            }
+
+            fetch("/api/status", { cache: "no-store" })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("status request failed");
+                    }
+
+                    return response.json();
+                })
+                .then(updateStatus)
+                .catch(function () {});
+        }
+
+        function updateRefreshToggle() {
+            var button = document.querySelector("[data-refresh-toggle]");
+
+            if (!button) {
+                return;
+            }
+
+            button.textContent = autoRefreshEnabled ? "Online" : "Paused";
+            button.classList.toggle("paused", !autoRefreshEnabled);
+            button.setAttribute("title", autoRefreshEnabled ? "Pause auto refresh" : "Resume auto refresh");
+        }
+
+        function setAutoRefresh(enabled) {
+            autoRefreshEnabled = enabled;
+            updateRefreshToggle();
+
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+
+            if (autoRefreshEnabled) {
+                refreshStatus();
+                refreshTimer = setInterval(refreshStatus, 1000);
+            }
+        }
+
+        function copyText(value) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(value);
+            }
+
+            var input = document.createElement("input");
+            input.value = value;
+            input.style.position = "fixed";
+            input.style.opacity = "0";
+            document.body.appendChild(input);
+            input.select();
+
+            try {
+                document.execCommand("copy");
+                return Promise.resolve();
+            } finally {
+                document.body.removeChild(input);
+            }
+        }
+
+        document.querySelectorAll("[data-copy]").forEach(function (button) {
+            button.addEventListener("click", function () {
+                var value = button.getAttribute("data-copy");
+
+                copyText(value).then(function () {
+                    button.classList.add("copied");
+                    button.setAttribute("title", "Copied");
+
+                    setTimeout(function () {
+                        button.classList.remove("copied");
+                        button.setAttribute("title", "Copy CID");
+                    }, 1200);
+                });
+            });
+        });
+
+        var refreshToggle = document.querySelector("[data-refresh-toggle]");
+        if (refreshToggle) {
+            refreshToggle.addEventListener("click", function () {
+                setAutoRefresh(!autoRefreshEnabled);
+            });
+        }
+
+        setAutoRefresh(true);
+    </script>
+</body>
+</html>
