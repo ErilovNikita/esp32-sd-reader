@@ -43,7 +43,7 @@ void led_blink_missing_card(void)
     static bool led_on = true;
 
     if (led_on) {
-        led_set(255, 0, 255);
+        led_set(255, 255, 255);
     } else {
         led_clear();
     }

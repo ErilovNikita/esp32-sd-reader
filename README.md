@@ -4,36 +4,11 @@
 [![Target](https://img.shields.io/badge/Target-ESP32--S3-blue)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![Language](https://img.shields.io/badge/Language-C-green)](https://en.wikipedia.org/wiki/C_(programming_language))
 
-![Device Case](stl/default.png)
+![Web Interface](docs/screenshot.png)
 
-## Example Output
-```bash
-═══════════════════════════════════════════════
- ESP32 SD READER v2.1 by @minitwiks
-═══════════════════════════════════════════════
+ESP32 SD Reader is an ESP32-S3 SD card reader with a built-in Wi-Fi access point and local web interface. After flashing, connect to the device Wi-Fi network, open the local status page, and read card status, CID, manufacturer data, storage usage, and ESP32 device information from any browser.
 
-Model           : SD16G
-Manufacturer ID : 0x03
-Manufacturer    : SanDisk / Western Digital
-OEM ID          : 0x5344
-Revision        : 128
-Serial          : 0x12345678
-Manufactured    : 05/2024
-Full CID        : XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-
-Filesystem      : FAT/exFAT
-Capacity        : 14.84 GB
-Used            : 2.10 GB
-Free            : 12.74 GB
-Usage           :  14% |====--------------------------|
-
-Bus             : SDMMC 1-bit
-Mount point     : /sdcard
-
-═══════════════════════════════════════════════
-```
-
-An ESP32-S3 project that detects a microSD/SD card, mounts its FAT/exFAT filesystem, and prints technical card information to the serial monitor: CID, manufacturer, serial number, manufacturing date, total capacity, used space, and free space.
+The serial monitor is still useful during startup because it prints the generated Wi-Fi network name, password, and local web address. The main day-to-day workflow is the web interface.
 
 ## Features
 
@@ -43,7 +18,15 @@ An ESP32-S3 project that detects a microSD/SD card, mounts its FAT/exFAT filesys
 - Capacity, used space, and free space reporting.
 - FAT/exFAT support through ESP-IDF FatFs.
 - Status indication with a WS2812 addressable RGB LED.
+- Matching LED and web status colors.
 - SDMMC 1-bit bus mode.
+- Built-in Wi-Fi access point with a local web status page.
+- Live web updates through `/api/status` without full page reloads.
+- Auto-refresh toggle on the web page.
+- Copy button for the full CID value.
+- Device information block with ESP32 ID, chip, CPU, and memory details.
+- Empty-card state that keeps device information visible and explains that no SD card data is available.
+- Project manifest with name, version, author, description, and GitHub repository metadata.
 
 ## 3D Printed Enclosure Models
 
@@ -65,10 +48,12 @@ Card Detect is active-low: when a card is inserted, GPIO 9 is expected to read `
 
 ## LED Status
 
+The web status indicator uses the same color and blinking behavior as the case LED.
+
 | Color | State |
 | --- | --- |
 | Blue | Device startup |
-| Magenta | Card is not inserted or was removed — slow blinking |
+| White | Card is not inserted or was removed — slow blinking |
 | Yellow | Card detected, mounting in progress |
 | Green | Card mounted successfully |
 | Red | Mount failed |
@@ -95,22 +80,22 @@ Set the target chip:
 idf.py set-target esp32s3
 ```
 
-Build the project:
+Flash the board:
 
 ```bash
-idf.py build
+idf.py flash
 ```
 
-Flash the board and open the serial monitor:
+Open the serial monitor to read the generated Wi-Fi credentials:
 
 ```bash
-idf.py -p /dev/ttyUSB0 flash monitor
+idf.py -p /dev/ttyUSB0 monitor
 ```
 
 On macOS, the serial port may look like this:
 
 ```bash
-idf.py -p /dev/cu.usbmodemXXXX flash monitor
+idf.py -p /dev/cu.usbmodemXXXX monitor
 ```
 
 To exit the monitor:
@@ -122,15 +107,48 @@ Ctrl + ]
 ## Usage
 
 1. Wire the SD module to the ESP32-S3 according to the pin table.
-2. Build and flash the project.
-3. Open the serial monitor.
-4. Insert an SD card.
-5. Read the card information printed in the serial monitor.
-6. When the card is removed, the project unmounts the filesystem and waits for the next card.
+2. Flash the project.
+3. Open the serial monitor and copy the Wi-Fi access point name and password.
+4. Connect your phone, tablet, or computer to that Wi-Fi network.
+5. Open `http://192.168.4.1/` in a browser.
+6. Insert an SD card.
+7. Read the card information in the web interface.
+8. Use the auto-refresh toggle if you want to pause live updates.
+9. When the card is removed, the card blocks are hidden and the page shows a no-card message above the device information block.
+
+## Web Status Page
+
+On startup, the device creates a Wi-Fi access point and prints its credentials:
+
+```text
+SSID: ESP32 SD Reader XXXXXX
+Password: sdreader123
+Open: http://192.168.4.1/
+```
+
+The `XXXXXX` suffix is generated from the device Wi-Fi MAC address, so multiple readers get different network names.
+
+The status page shows:
+
+- Overall device/card state with the same color and blinking behavior as the case LED.
+- Card model, manufacturer, Manufacturer ID, OEM ID, revision, serial, manufacturing date, and full CID.
+- Storage usage as `Used XGb of XGb`, plus capacity, used, and free values.
+- Device ID, ESP32 target, chip revision, CPU core count, internal memory, SD bus, and last error.
+- GitHub repository link in the footer.
+
+The page updates once per second through `/api/status`, so it does not reload the whole document. The `Online` button pauses and resumes automatic refresh.
+
+When there is no card data, the page hides the card-specific blocks and shows a short message asking the user to insert the card or check that it is installed correctly. The device information block remains visible.
+
+To change the static password, AP prefix, SSID separator, IP address, gateway, netmask, HTTP port, or HTML/JSON render buffer sizes, edit `main/config/web_config.h`.
+
+To edit the web page layout and styles, update `main/web/web_status_template.html`.
+
+Project metadata used by the firmware and web footer is stored in `main/config/project_manifest.h`.
 
 ## Board Pin Customization
 
-If your board uses different pins, update these values in `main/sd_cid_reader.c`:
+If your board uses different pins, update these values in `main/sd/sd_card_logic.c` and `main/led/led_control.c`:
 
 ```c
 #define PIN_SD_CLK      12
@@ -140,10 +158,20 @@ If your board uses different pins, update these values in `main/sd_cid_reader.c`
 #define PIN_RGB_LED     21
 ```
 
-After changing the pins, rebuild and flash the project again:
+## Source Layout
+
+- `main/app` - application entry point.
+- `main/sd` - card detect, mount/unmount, CID and storage status.
+- `main/led` - WS2812 status LED control.
+- `main/web` - Wi-Fi web status page server, renderer, and HTML template.
+- `main/config` - editable web/AP configuration and project manifest.
+
+Project metadata such as display name, version, author, description, and repository info is kept in `main/config/project_manifest.h`.
+
+After changing the pins, flash the project again:
 
 ```bash
-idf.py build flash monitor
+idf.py flash monitor
 ```
 
 ## Troubleshooting

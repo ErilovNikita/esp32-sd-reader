@@ -9,7 +9,10 @@
 #include "driver/sdmmc_host.h"
 #include "esp_vfs_fat.h"
 #include "ff.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "led_control.h"
+#include "project_manifest.h"
 #include "sdmmc_cmd.h"
 
 #define PIN_SD_CLK      12
@@ -20,6 +23,74 @@
 
 static sdmmc_card_t *mounted_card = NULL;
 static bool is_mounted = false;
+static SemaphoreHandle_t status_mutex = NULL;
+static web_status_snapshot_t current_status = {
+    .state = WEB_STATUS_STARTING,
+    .bus = "SDMMC 1-bit",
+    .last_error = "None",
+};
+
+static void status_lock(void)
+{
+    if (status_mutex != NULL) {
+        xSemaphoreTake(status_mutex, portMAX_DELAY);
+    }
+}
+
+static void status_unlock(void)
+{
+    if (status_mutex != NULL) {
+        xSemaphoreGive(status_mutex);
+    }
+}
+
+static void clear_card_status_fields(web_status_snapshot_t *status)
+{
+    status->mounted = false;
+    status->model[0] = '\0';
+    status->manufacturer[0] = '\0';
+    status->manufacturer_id = 0;
+    status->oem_id = 0;
+    status->revision = 0;
+    status->serial = 0;
+    status->manufacture_month = 0;
+    status->manufacture_year = 0;
+    status->full_cid[0] = '\0';
+    status->capacity_bytes = 0;
+    status->used_bytes = 0;
+    status->free_bytes = 0;
+    status->usage_percent = 0;
+}
+
+static void update_status_missing(void)
+{
+    status_lock();
+    current_status.state = WEB_STATUS_CARD_MISSING;
+    current_status.card_present = false;
+    current_status.last_error = "None";
+    clear_card_status_fields(&current_status);
+    status_unlock();
+}
+
+static void update_status_mounting(void)
+{
+    status_lock();
+    current_status.state = WEB_STATUS_MOUNTING;
+    current_status.card_present = true;
+    current_status.last_error = "None";
+    clear_card_status_fields(&current_status);
+    status_unlock();
+}
+
+static void update_status_mount_failed(esp_err_t error)
+{
+    status_lock();
+    current_status.state = WEB_STATUS_MOUNT_FAILED;
+    current_status.card_present = true;
+    current_status.last_error = esp_err_to_name(error);
+    clear_card_status_fields(&current_status);
+    status_unlock();
+}
 
 static const char *manufacturer_name(uint8_t mfg_id)
 {
@@ -109,7 +180,7 @@ static void build_cid_string(const sdmmc_card_t *card, char *out, size_t out_siz
     }
 }
 
-static void print_storage_info(void)
+static void read_storage_info(web_status_snapshot_t *status)
 {
     FATFS *fs = NULL;
     DWORD free_clusters = 0;
@@ -118,6 +189,7 @@ static void print_storage_info(void)
 
     if (fr != FR_OK || fs == NULL) {
         printf("Filesystem      : mounted, f_getfree failed: %d\n", fr);
+        status->last_error = "f_getfree failed";
         return;
     }
 
@@ -137,6 +209,11 @@ static void print_storage_info(void)
 
     int percent = total > 0 ? (int)((used * 100) / total) : 0;
 
+    status->capacity_bytes = total;
+    status->used_bytes = used;
+    status->free_bytes = free;
+    status->usage_percent = percent > 100 ? 100 : (uint8_t)percent;
+
     printf("Filesystem      : FAT/exFAT\n");
     printf("Capacity        : %.2f GB\n", bytes_to_gb(total));
     printf("Used            : %.2f GB\n", bytes_to_gb(used));
@@ -146,6 +223,10 @@ static void print_storage_info(void)
 
 void card_detect_init(void)
 {
+    if (status_mutex == NULL) {
+        status_mutex = xSemaphoreCreateMutex();
+    }
+
     gpio_config_t io_conf = {
         .pin_bit_mask = 1ULL << PIN_CARD_DETECT,
         .mode = GPIO_MODE_INPUT,
@@ -166,11 +247,13 @@ esp_err_t mount_card(void)
 {
     if (!card_present()) {
         printf("\n[SD] Card not inserted\n");
+        update_status_missing();
         led_blink_missing_card();
         return ESP_ERR_NOT_FOUND;
     }
 
     printf("[SD] Card detected, mounting...\n");
+    update_status_mounting();
     led_set(255, 255, 0);
 
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
@@ -213,6 +296,7 @@ esp_err_t mount_card(void)
         led_set(255, 0, 0);
         mounted_card = NULL;
         is_mounted = false;
+        update_status_mount_failed(ret);
         return ret;
     }
 
@@ -224,9 +308,32 @@ esp_err_t mount_card(void)
     int mfg_month = mounted_card->cid.date & 0x0F;
     int mfg_year  = 2000 + ((mounted_card->cid.date >> 4) & 0xFF);
 
+    web_status_snapshot_t mounted_status = {
+        .state = WEB_STATUS_MOUNTED,
+        .card_present = true,
+        .mounted = true,
+        .manufacturer_id = mounted_card->cid.mfg_id,
+        .oem_id = mounted_card->cid.oem_id,
+        .revision = mounted_card->cid.revision,
+        .serial = mounted_card->cid.serial,
+        .manufacture_month = mfg_month,
+        .manufacture_year = mfg_year,
+        .bus = "SDMMC 1-bit",
+        .last_error = "None",
+    };
+
+    snprintf(mounted_status.model, sizeof(mounted_status.model), "%s", mounted_card->cid.name);
+    snprintf(
+        mounted_status.manufacturer,
+        sizeof(mounted_status.manufacturer),
+        "%s",
+        manufacturer_name(mounted_card->cid.mfg_id)
+    );
+    snprintf(mounted_status.full_cid, sizeof(mounted_status.full_cid), "%s", cid_full);
+
     printf("\n");
     printf("═══════════════════════════════════════════════\n");
-    printf(" ESP32 SD Reader v2.1 by @minitwiks\n");
+    printf(" %s v%s by %s\n", PROJECT_DISPLAY_NAME, PROJECT_VERSION, PROJECT_AUTHOR);
     printf("═══════════════════════════════════════════════\n\n");
 
     printf("Model           : %s\n", mounted_card->cid.name);
@@ -238,11 +345,14 @@ esp_err_t mount_card(void)
     printf("Manufactured    : %02d/%04d\n", mfg_month, mfg_year);
     printf("Full CID        : %s\n\n", cid_full);
 
-    print_storage_info();
+    read_storage_info(&mounted_status);
+
+    status_lock();
+    current_status = mounted_status;
+    status_unlock();
 
     printf("\n");
     printf("Bus             : SDMMC 1-bit\n");
-    printf("Mount point     : %s\n", MOUNT_POINT);
     printf("\n═══════════════════════════════════════════════\n");
 
     led_set(0, 255, 0);
@@ -252,7 +362,10 @@ esp_err_t mount_card(void)
 
 void unmount_card(void)
 {
-    if (!is_mounted) return;
+    if (!is_mounted) {
+        update_status_missing();
+        return;
+    }
 
     printf("\n[SD] Card removed, unmounting...\n");
 
@@ -262,5 +375,22 @@ void unmount_card(void)
     is_mounted = false;
 
     printf("[SD] Unmounted\n");
+    update_status_missing();
     led_blink_missing_card();
+}
+
+void sd_card_mark_missing(void)
+{
+    update_status_missing();
+}
+
+void sd_card_get_status(web_status_snapshot_t *snapshot)
+{
+    if (snapshot == NULL) {
+        return;
+    }
+
+    status_lock();
+    *snapshot = current_status;
+    status_unlock();
 }
