@@ -1,97 +1,25 @@
+#include "sd_card_logic.h"
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/statvfs.h>
 
-#include "esp_log.h"
-#include "esp_err.h"
-#include "esp_vfs_fat.h"
-#include "ff.h"
 #include "driver/gpio.h"
 #include "driver/sdmmc_host.h"
+#include "esp_vfs_fat.h"
+#include "ff.h"
+#include "led_control.h"
 #include "sdmmc_cmd.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
-#include "led_strip.h"
-
-static const char *TAG = "SD_READER";
 
 #define PIN_SD_CLK      12
 #define PIN_SD_CMD      11
 #define PIN_SD_D0       10
 #define PIN_CARD_DETECT 9
-
-#define PIN_RGB_LED     21
 #define MOUNT_POINT     "/sdcard"
 
 static sdmmc_card_t *mounted_card = NULL;
 static bool is_mounted = false;
-static led_strip_handle_t led;
-
-static bool card_present(void)
-{
-    return gpio_get_level(PIN_CARD_DETECT) == 0;
-}
-
-static void led_set(uint8_t r, uint8_t g, uint8_t b)
-{
-    if (!led) return;
-    led_strip_set_pixel(led, 0, r, g, b);
-    led_strip_refresh(led);
-}
-
-static void led_init(void)
-{
-    led_strip_config_t strip_config = {
-        .strip_gpio_num = PIN_RGB_LED,
-        .max_leds = 1,
-        .led_model = LED_MODEL_WS2812,
-        .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB,
-    };
-
-    led_strip_rmt_config_t rmt_config = {
-        .clk_src = RMT_CLK_SRC_DEFAULT,
-        .resolution_hz = 10 * 1000 * 1000,
-        .mem_block_symbols = 64,
-    };
-
-    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led));
-    led_strip_clear(led);
-}
-
-static void led_clear(void)
-{
-    if (!led) return;
-    led_strip_clear(led);
-    led_strip_refresh(led);
-}
-
-static void led_blink_missing_card(void)
-{
-    static bool led_on = true;
-
-    if (led_on) {
-        led_set(255, 0, 255);
-    } else {
-        led_clear();
-    }
-
-    led_on = !led_on;
-}
-
-static void card_detect_init(void)
-{
-    gpio_config_t io_conf = {
-        .pin_bit_mask = 1ULL << PIN_CARD_DETECT,
-        .mode = GPIO_MODE_INPUT,
-        .pull_up_en = GPIO_PULLUP_ENABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
-
-    gpio_config(&io_conf);
-}
 
 static const char *manufacturer_name(uint8_t mfg_id)
 {
@@ -216,7 +144,25 @@ static void print_storage_info(void)
     print_usage_bar(percent);
 }
 
-static esp_err_t mount_card(void)
+void card_detect_init(void)
+{
+    gpio_config_t io_conf = {
+        .pin_bit_mask = 1ULL << PIN_CARD_DETECT,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+
+    gpio_config(&io_conf);
+}
+
+bool card_present(void)
+{
+    return gpio_get_level(PIN_CARD_DETECT) == 0;
+}
+
+esp_err_t mount_card(void)
 {
     if (!card_present()) {
         printf("\n[SD] Card not inserted\n");
@@ -304,7 +250,7 @@ static esp_err_t mount_card(void)
     return ESP_OK;
 }
 
-static void unmount_card(void)
+void unmount_card(void)
 {
     if (!is_mounted) return;
 
@@ -317,53 +263,4 @@ static void unmount_card(void)
 
     printf("[SD] Unmounted\n");
     led_blink_missing_card();
-}
-
-void app_main(void)
-{
-    esp_log_level_set("*", ESP_LOG_WARN);
-    esp_log_level_set(TAG, ESP_LOG_INFO);
-
-    ESP_LOGI(TAG, "Starting SD Card Reader");
-
-    led_init();
-    card_detect_init();
-
-    led_set(0, 0, 255);
-
-    bool last_present = card_present();
-
-    if (last_present) {
-        mount_card();
-    } else {
-        printf("\n[SD] Card not inserted\n");
-        led_blink_missing_card();
-    }
-
-    while (true) {
-        bool now_present = card_present();
-
-        if (now_present != last_present) {
-            vTaskDelay(pdMS_TO_TICKS(200));
-
-            now_present = card_present();
-
-            if (now_present != last_present) {
-                last_present = now_present;
-
-                if (now_present) {
-                    mount_card();
-                } else {
-                    unmount_card();
-                }
-            }
-        }
-
-        if (!last_present) {
-            led_blink_missing_card();
-            vTaskDelay(pdMS_TO_TICKS(700));
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(100));
-        }
-    }
 }
