@@ -60,6 +60,26 @@ static void led_init(void)
     led_strip_clear(led);
 }
 
+static void led_clear(void)
+{
+    if (!led) return;
+    led_strip_clear(led);
+    led_strip_refresh(led);
+}
+
+static void led_blink_missing_card(void)
+{
+    static bool led_on = true;
+
+    if (led_on) {
+        led_set(255, 0, 255);
+    } else {
+        led_clear();
+    }
+
+    led_on = !led_on;
+}
+
 static void card_detect_init(void)
 {
     gpio_config_t io_conf = {
@@ -200,7 +220,7 @@ static esp_err_t mount_card(void)
 {
     if (!card_present()) {
         printf("\n[SD] Card not inserted\n");
-        led_set(255, 128, 0);
+        led_blink_missing_card();
         return ESP_ERR_NOT_FOUND;
     }
 
@@ -251,7 +271,6 @@ static esp_err_t mount_card(void)
     }
 
     is_mounted = true;
-    led_set(0, 255, 0);
 
     char cid_full[33] = {0};
     build_cid_string(mounted_card, cid_full, sizeof(cid_full));
@@ -280,6 +299,8 @@ static esp_err_t mount_card(void)
     printf("Mount point     : %s\n", MOUNT_POINT);
     printf("\n═══════════════════════════════════════════════\n");
 
+    led_set(0, 255, 0);
+
     return ESP_OK;
 }
 
@@ -295,7 +316,7 @@ static void unmount_card(void)
     is_mounted = false;
 
     printf("[SD] Unmounted\n");
-    led_set(255, 128, 0);
+    led_blink_missing_card();
 }
 
 void app_main(void)
@@ -316,7 +337,7 @@ void app_main(void)
         mount_card();
     } else {
         printf("\n[SD] Card not inserted\n");
-        led_set(255, 128, 0);
+        led_blink_missing_card();
     }
 
     while (true) {
@@ -338,6 +359,11 @@ void app_main(void)
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(100));
+        if (!last_present) {
+            led_blink_missing_card();
+            vTaskDelay(pdMS_TO_TICKS(700));
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
     }
 }

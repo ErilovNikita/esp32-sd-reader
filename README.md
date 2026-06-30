@@ -68,7 +68,7 @@ Card Detect is active-low: when a card is inserted, GPIO 9 is expected to read `
 | Color | State |
 | --- | --- |
 | Blue | Device startup |
-| Orange | Card is not inserted or was removed |
+| Magenta | Card is not inserted or was removed — slow blinking |
 | Yellow | Card detected, mounting in progress |
 | Green | Card mounted successfully |
 | Red | Mount failed |
