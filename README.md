@@ -4,8 +4,9 @@
 [![Target](https://img.shields.io/badge/Target-ESP32--S3-blue)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![Language](https://img.shields.io/badge/Language-C-green)](https://en.wikipedia.org/wiki/C_(programming_language))
 
-## Example Output
+![Device Case](stl/default.png)
 
+## Example Output
 ```bash
 ═══════════════════════════════════════════════
  ESP32 SD READER v2.1 by @minitwiks
@@ -43,6 +44,10 @@ An ESP32-S3 project that detects a microSD/SD card, mounts its FAT/exFAT filesys
 - FAT/exFAT support through ESP-IDF FatFs.
 - Status indication with a WS2812 addressable RGB LED.
 - SDMMC 1-bit bus mode.
+
+## 3D Printed Enclosure Models
+
+This project also includes 3D-printable enclosure models for the device. You can find the STL files and a short description in the [stl](stl) folder.
 
 ## Hardware
 
