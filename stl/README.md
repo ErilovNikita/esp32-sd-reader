@@ -1,24 +1,19 @@
 # STL enclosure models
+This folder contains 3D-printable enclosure models for the ESP32 SD Reader project. There are two model versions available:
 
-![Enclosure preview](default.png)
+- [V1](v1) - the first enclosure version. It is kept for reference and compatibility, but is considered outdated.
+- [V2](v2) - the newer and current enclosure version. It is more compact, stronger, more miniature, and recommended for new prints.
 
-This folder contains 3D models for the ESP32 SD Reader project enclosure. All files are ready for printing and are suitable for assembling a basic protective case.
+## V1 - outdated version
+![V1 enclosure preview](v1/default.png)
 
-## What is included
+V1 uses a three-part layout with a main case, a separate ESP32 holder, and a top cover. Use it if you already printed this version or need the older holder-based design.
 
-- **Case.stl** — the main body of the enclosure, which covers and protects the internal electronics.
-- **ESP Holder.stl** — a holder/bracket for the ESP32 board, providing a secure fit inside the enclosure.
-- **Top.stl** — the top part of the enclosure, which closes the assembly from above.
+## V2 - current version
+![V2 enclosure preview](v2/default.png)
 
-## Printing recommendations
+V2 uses an improved two-part layout with a bottom part and a top cover. Compared with V1, the case is more compact, sturdier, more miniature, and easier to assemble. This is the best version to use for new builds.
 
-- It is best to use a durable plastic such as PETG or ABS.
-- For easier assembly, check the fit of the parts before the final print.
-- If needed, slightly adjust the dimensions after the first test fit.
-
-## Assembly
-
-1. Print all three parts.
-2. Place the ESP32 into the holder.
-3. Assemble the enclosure from the bottom and top parts.
-4. If needed, secure the components with suitable fasteners.
+## Files
+- [V1 files and details(Older)](v1/README.md)
+- [V2 files and details](v2/README.md)
