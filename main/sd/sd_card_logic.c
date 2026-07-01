@@ -1,6 +1,5 @@
 #include "sd_card_logic.h"
 
-#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/statvfs.h>
@@ -12,7 +11,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "led_control.h"
-#include "project_manifest.h"
 #include "sdmmc_cmd.h"
 
 #define PIN_SD_CLK      12
@@ -110,25 +108,6 @@ static const char *manufacturer_name(uint8_t mfg_id)
     }
 }
 
-static double bytes_to_gb(uint64_t bytes)
-{
-    return bytes / 1024.0 / 1024.0 / 1024.0;
-}
-
-static void print_usage_bar(int percent)
-{
-    const int width = 30;
-    int filled = (percent * width) / 100;
-
-    printf("Usage           : %3d%% |", percent);
-
-    for (int i = 0; i < width; i++) {
-        putchar(i < filled ? '=' : '-');
-    }
-
-    printf("|\n");
-}
-
 static uint8_t sd_crc7(const uint8_t *data, int len)
 {
     uint8_t crc = 0;
@@ -188,7 +167,6 @@ static void read_storage_info(web_status_snapshot_t *status)
     FRESULT fr = f_getfree(MOUNT_POINT, &free_clusters, &fs);
 
     if (fr != FR_OK || fs == NULL) {
-        printf("Filesystem      : mounted, f_getfree failed: %d\n", fr);
         status->last_error = "f_getfree failed";
         return;
     }
@@ -213,12 +191,6 @@ static void read_storage_info(web_status_snapshot_t *status)
     status->used_bytes = used;
     status->free_bytes = free;
     status->usage_percent = percent > 100 ? 100 : (uint8_t)percent;
-
-    printf("Filesystem      : FAT/exFAT\n");
-    printf("Capacity        : %.2f GB\n", bytes_to_gb(total));
-    printf("Used            : %.2f GB\n", bytes_to_gb(used));
-    printf("Free            : %.2f GB\n", bytes_to_gb(free));
-    print_usage_bar(percent);
 }
 
 void card_detect_init(void)
@@ -246,13 +218,11 @@ bool card_present(void)
 esp_err_t mount_card(void)
 {
     if (!card_present()) {
-        printf("\n[SD] Card not inserted\n");
         update_status_missing();
         led_blink_missing_card();
         return ESP_ERR_NOT_FOUND;
     }
 
-    printf("[SD] Card detected, mounting...\n");
     update_status_mounting();
     led_set(255, 255, 0);
 
@@ -292,7 +262,6 @@ esp_err_t mount_card(void)
     );
 
     if (ret != ESP_OK) {
-        printf("[SD] Mount failed: %s\n", esp_err_to_name(ret));
         led_set(255, 0, 0);
         mounted_card = NULL;
         is_mounted = false;
@@ -331,29 +300,11 @@ esp_err_t mount_card(void)
     );
     snprintf(mounted_status.full_cid, sizeof(mounted_status.full_cid), "%s", cid_full);
 
-    printf("\n");
-    printf("═══════════════════════════════════════════════\n");
-    printf(" %s v%s by %s\n", PROJECT_DISPLAY_NAME, PROJECT_VERSION, PROJECT_AUTHOR);
-    printf("═══════════════════════════════════════════════\n\n");
-
-    printf("Model           : %s\n", mounted_card->cid.name);
-    printf("Manufacturer ID : 0x%02X\n", mounted_card->cid.mfg_id);
-    printf("Manufacturer    : %s\n", manufacturer_name(mounted_card->cid.mfg_id));
-    printf("OEM ID          : 0x%04X\n", mounted_card->cid.oem_id);
-    printf("Revision        : %d\n", mounted_card->cid.revision);
-    printf("Serial          : 0x%08X\n", (unsigned int)mounted_card->cid.serial);
-    printf("Manufactured    : %02d/%04d\n", mfg_month, mfg_year);
-    printf("Full CID        : %s\n\n", cid_full);
-
     read_storage_info(&mounted_status);
 
     status_lock();
     current_status = mounted_status;
     status_unlock();
-
-    printf("\n");
-    printf("Bus             : SDMMC 1-bit\n");
-    printf("\n═══════════════════════════════════════════════\n");
 
     led_set(0, 255, 0);
 
@@ -367,14 +318,11 @@ void unmount_card(void)
         return;
     }
 
-    printf("\n[SD] Card removed, unmounting...\n");
-
     esp_vfs_fat_sdcard_unmount(MOUNT_POINT, mounted_card);
 
     mounted_card = NULL;
     is_mounted = false;
 
-    printf("[SD] Unmounted\n");
     update_status_missing();
     led_blink_missing_card();
 }

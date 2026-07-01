@@ -1,6 +1,7 @@
 #include "web_server.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "esp_check.h"
@@ -10,6 +11,7 @@
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
+#include "qrcode.h"
 #include "sd_card_logic.h"
 #include "web_config.h"
 #include "web_status.h"
@@ -119,6 +121,142 @@ static void build_web_url(char *url, size_t url_size)
     }
 }
 
+static size_t append_wifi_qr_escaped(char *out, size_t out_size, const char *value)
+{
+    size_t pos = 0;
+
+    for (size_t i = 0; value[i] != '\0' && pos + 1 < out_size; i++) {
+        char c = value[i];
+
+        if ((c == '\\' || c == ';' || c == ',' || c == ':' || c == '"') && pos + 2 < out_size) {
+            out[pos++] = '\\';
+        }
+
+        if (pos + 1 >= out_size) {
+            break;
+        }
+
+        out[pos++] = c;
+    }
+
+    out[pos] = '\0';
+    return pos;
+}
+
+static void build_wifi_qr_payload(char *payload, size_t payload_size, const char *ssid)
+{
+    char escaped_ssid[80] = {0};
+    char escaped_password[80] = {0};
+
+    append_wifi_qr_escaped(escaped_ssid, sizeof(escaped_ssid), ssid);
+    append_wifi_qr_escaped(escaped_password, sizeof(escaped_password), WEB_AP_PASSWORD);
+
+    if (strlen(WEB_AP_PASSWORD) == 0) {
+        snprintf(payload, payload_size, "WIFI:T:nopass;S:%s;;", escaped_ssid);
+    } else {
+        snprintf(payload, payload_size, "WIFI:T:WPA;S:%s;P:%s;;", escaped_ssid, escaped_password);
+    }
+}
+
+typedef struct {
+    const char *ssid;
+    const char *url;
+} connection_info_t;
+
+static const char *qr_console_blocks[] = {
+    "  ",
+    "\u2580 ",
+    " \u2580",
+    "\u2580\u2580",
+    "\u2584 ",
+    "\u2588 ",
+    "\u2584\u2580",
+    "\u2588\u2580",
+    " \u2584",
+    "\u2580\u2584",
+    " \u2588",
+    "\u2580\u2588",
+    "\u2584\u2584",
+    "\u2588\u2584",
+    "\u2584\u2588",
+    "\u2588\u2588",
+};
+
+static void print_connection_panel(esp_qrcode_handle_t qrcode, void *user_data)
+{
+    const connection_info_t *info = (const connection_info_t *)user_data;
+    const int border = 2;
+    const int size = esp_qrcode_get_size(qrcode);
+    const int row_count = (size + border * 2 + 1) / 2;
+    const int side_line_count = 7;
+    const int side_start_row = (row_count - side_line_count) / 2;
+    char side_lines[7][96] = {0};
+
+    snprintf(side_lines[0], sizeof(side_lines[0]), "+---------------------------------------------+");
+    snprintf(side_lines[1], sizeof(side_lines[1]), "| ESP32 SD Reader Wi-Fi                       |");
+    snprintf(side_lines[2], sizeof(side_lines[2]), "|                                             |");
+    snprintf(side_lines[3], sizeof(side_lines[3]), "| SSID     : %-32.32s |", info->ssid);
+    snprintf(side_lines[4], sizeof(side_lines[4]), "| Password : %-32.32s |", strlen(WEB_AP_PASSWORD) > 0 ? WEB_AP_PASSWORD : "(open)");
+    snprintf(side_lines[5], sizeof(side_lines[5]), "| Web UI   : %-32.32s |", info->url);
+    snprintf(side_lines[6], sizeof(side_lines[6]), "+---------------------------------------------+");
+
+    printf("\n");
+
+    for (int y = -border, row = 0; y < size + border; y += 2, row++) {
+        for (int x = -border; x < size + border; x += 2) {
+            unsigned char block = 0;
+
+            if (esp_qrcode_get_module(qrcode, x, y)) {
+                block |= 1 << 0;
+            }
+            if (esp_qrcode_get_module(qrcode, x + 1, y)) {
+                block |= 1 << 1;
+            }
+            if (esp_qrcode_get_module(qrcode, x, y + 1)) {
+                block |= 1 << 2;
+            }
+            if (esp_qrcode_get_module(qrcode, x + 1, y + 1)) {
+                block |= 1 << 3;
+            }
+
+            printf("%s", qr_console_blocks[block]);
+        }
+
+        int side_line = row - side_start_row;
+        if (side_line >= 0 && side_line < side_line_count) {
+            printf("    %s", side_lines[side_line]);
+        }
+
+        printf("\n");
+    }
+
+    printf("\n");
+}
+
+static void print_connection_info(const char *ssid, const char *url)
+{
+    char wifi_payload[180] = {0};
+    connection_info_t info = {
+        .ssid = ssid,
+        .url = url,
+    };
+
+    build_wifi_qr_payload(wifi_payload, sizeof(wifi_payload), ssid);
+
+    esp_qrcode_config_t qr_config = ESP_QRCODE_CONFIG_DEFAULT();
+    qr_config.display_func_with_cb = print_connection_panel;
+    qr_config.user_data = &info;
+    qr_config.max_qrcode_version = 6;
+    qr_config.qrcode_ecc_level = ESP_QRCODE_ECC_LOW;
+
+    if (esp_qrcode_generate(&qr_config, wifi_payload) != ESP_OK) {
+        printf("\n");
+        printf("SSID     : %s\n", ssid);
+        printf("Password : %s\n", strlen(WEB_AP_PASSWORD) > 0 ? WEB_AP_PASSWORD : "(open)");
+        printf("Web UI   : %s\n\n", url);
+    }
+}
+
 static esp_err_t start_http_server(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -199,10 +337,7 @@ esp_err_t web_server_start(void)
     ESP_RETURN_ON_ERROR(esp_wifi_start(), TAG, "esp_wifi_start failed");
     ESP_RETURN_ON_ERROR(start_http_server(), TAG, "HTTP server start failed");
 
-    ESP_LOGI(TAG, "Wi-Fi AP started");
-    ESP_LOGI(TAG, "SSID: %s", ssid);
-    ESP_LOGI(TAG, "Password: %s", strlen(WEB_AP_PASSWORD) > 0 ? WEB_AP_PASSWORD : "(open)");
-    ESP_LOGI(TAG, "Open: %s", url);
+    print_connection_info(ssid, url);
 
     return ESP_OK;
 }

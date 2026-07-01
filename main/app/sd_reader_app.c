@@ -7,7 +7,6 @@
 #include "freertos/task.h"
 
 #include "led_control.h"
-#include "project_manifest.h"
 #include "sd_card_logic.h"
 #include "web_server.h"
 
@@ -28,10 +27,8 @@ static void init_nvs(void)
 void app_main(void)
 {
     esp_log_level_set("*", ESP_LOG_WARN);
-    esp_log_level_set(TAG, ESP_LOG_INFO);
-    esp_log_level_set("WEB", ESP_LOG_INFO);
-
-    ESP_LOGI(TAG, "Starting %s v%s", PROJECT_DISPLAY_NAME, PROJECT_VERSION);
+    esp_log_level_set(TAG, ESP_LOG_WARN);
+    esp_log_level_set("WEB", ESP_LOG_WARN);
 
     init_nvs();
 
@@ -46,7 +43,6 @@ void app_main(void)
     if (last_present) {
         mount_card();
     } else {
-        printf("\n[SD] Card not inserted\n");
         sd_card_mark_missing();
         led_blink_missing_card();
     }
