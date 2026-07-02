@@ -4,7 +4,7 @@
 [![Target](https://img.shields.io/badge/Target-ESP32--S3-blue)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![Language](https://img.shields.io/badge/Language-C-green)](https://en.wikipedia.org/wiki/C_(programming_language))
 
-![Web Interface](docs/screenshot.png)
+![Web Interface](image/screenshot.png)
 
 ESP32 SD Reader with a built-in Wi-Fi access point and web interface. After flashing, connect to the device Wi-Fi network, open the local status page, and read card status, CID, manufacturer data, storage usage, and ESP32 device information from any browser.
 
@@ -21,13 +21,10 @@ The serial monitor is still useful during startup because it prints the generate
 - Built-in Wi-Fi access point with a web status page.
 - Device information block with ESP32 ID, chip, CPU, and memory details.
 
-## 3D Printed Enclosure Models
-This project also includes 3D-printable enclosure models for the device. See the [STL models overview](stl) for previews and version notes:
+## Hardware Equipment
+The reference build uses a compact ESP32-S3 controller and an SD reader module documented on the [hardware assembly page](hardware).
 
-- [V1 enclosure models](stl/v1) - three-part case with a separate ESP32 holder.
-- [V2 enclosure models](stl/v2) - updated two-part case with bottom and top parts.
-
-## Hardware
+## Pinout
 The project uses SDMMC in 1-bit mode and a dedicated card detect pin.
 
 | Signal | ESP32-S3 GPIO |
@@ -42,7 +39,7 @@ Card Detect is active-low: when a card is inserted, GPIO 9 is expected to read `
 
 ## LED Status
 >[!TIP] 
-The web status indicator uses the same color and blinking behavior as the case LED.
+The web status indicator uses the same color and blinking behavior as the device LED.
 
 | Color | State |
 | --- | --- |
@@ -115,7 +112,7 @@ Open: http://192.168.4.1/
 The `XXXXXX` suffix is generated from the device Wi-Fi MAC address, so multiple readers get different network names.
 
 The status page shows:
-- Overall device/card state with the same color and blinking behavior as the case LED.
+- Overall device/card state with the same color and blinking behavior as the device LED.
 - Card model, manufacturer, Manufacturer ID, OEM ID, revision, serial, manufacturing date, and full CID.
 - Storage usage as `Used XGb of XGb`, plus capacity, used, and free values.
 - Device ID, ESP32 target, chip revision, CPU core count, internal memory, SD bus, and last error.
